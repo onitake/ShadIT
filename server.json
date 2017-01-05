@@ -1,0 +1,9 @@
+{
+	"listen": ":8080",
+	"uptime": 60,
+	"downtime": 60,
+	"fliptime": 3,
+	"shades": [
+		{ "name": "1", "gpioup": 24, "gpiodown": 25 }
+	]
+}
