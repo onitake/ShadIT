@@ -2,13 +2,19 @@ package main
 
 import (
 	"log"
-	"strings"
+	"net/url"
 	"net/http"
 	"encoding/json"
 )
 
+var (
+	ErrInternal = []byte("{'error':'internal'}")
+	ErrNotImplemented = []byte("{'error':'not_implemented'}")
+	ErrInvalidObject = []byte("{'error':'invalid_object'}")
+)
+
 type Endpoint interface {
-	Handle(writer http.ResponseWriter, request *http.Request)
+	Handle(path []string, query url.Values) ([]byte, int)
 }
 
 type RootEndpoint struct {
@@ -21,58 +27,53 @@ func NewRootEndpoint(state *ShadeState) Endpoint {
 	}
 }
 
-func (ep *RootEndpoint) Handle(writer http.ResponseWriter, request *http.Request) {
-	path := strings.Split(request.URL.Path, "/")
-	log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
-	if (len(path) == 0) {
-		shades := make(map[string]map[string]interface{})
-		for _, shade := range(ep.State.Shades) {
-			shades[shade.Name] = map[string]interface{}{
-				"name": shade.Name,
-				"position": shade.Position,
-				"angle": shade.Angle,
-			}
-		}
-		writer.Header().Add("Content-Type", "application/json")
-		response, error := json.Marshal(map[string]interface{}{
-			"shades": shades,
-			"error": "none",
-		})
-		if (error == nil) {
-			writer.WriteHeader(http.StatusOK);
-			writer.Write(response)
-		} else {
-			writer.WriteHeader(http.StatusInternalServerError);
-			writer.Write([]byte("{'error':'internal'}"))
-			log.Print(error)
-		}
-	} else {
-		shade := ep.State.Shades[path[0]]
-		if (shade != nil) {
-			if (len(path) > 1) {
-				writer.Header().Add("Content-Type", "application/json")
-				writer.WriteHeader(http.StatusNotFound);
-				writer.Write([]byte("{'error':'not_implemented'}"))
-			} else {
-				writer.Header().Add("Content-Type", "application/json")
-				response, error := json.Marshal(map[string]interface{}{
+func (ep *RootEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
+	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
+	if (len(path) >= 1) {
+		if (path[0] == "") {
+			shades := make(map[string]map[string]interface{})
+			for _, shade := range(ep.State.Shades) {
+				shades[shade.Name] = map[string]interface{}{
 					"name": shade.Name,
 					"position": shade.Position,
 					"angle": shade.Angle,
-				})
-				if (error == nil) {
-					writer.WriteHeader(http.StatusOK);
-					writer.Write(response)
-				} else {
-					writer.WriteHeader(http.StatusInternalServerError);
-					writer.Write([]byte("{'error':'internal'}"))
-					log.Print(error)
 				}
 			}
+			response, err := json.Marshal(map[string]interface{}{
+				"shades": shades,
+				"error": "none",
+			})
+			if (err == nil) {
+				return response, http.StatusOK
+			} else {
+				log.Print(err)
+				return ErrInternal, http.StatusInternalServerError
+			}
 		} else {
-			writer.Header().Add("Content-Type", "application/json")
-			writer.WriteHeader(http.StatusNotFound);
-			writer.Write([]byte("{'error':'invalid_object'}"))
+			shade := ep.State.Shades[path[0]]
+			if (shade != nil) {
+				if (len(path) > 1) {
+					return ErrNotImplemented, http.StatusNotFound
+				} else {
+					response, err := json.Marshal(map[string]interface{}{
+						"name": shade.Name,
+						"position": shade.Position,
+						"angle": shade.Angle,
+					})
+					if (err == nil) {
+						return response, http.StatusOK
+					} else {
+						log.Print(err)
+						return ErrInternal, http.StatusInternalServerError
+					}
+				}
+			} else {
+				log.Printf("restreamer: object %s not found\n", path[0])
+				return ErrInvalidObject, http.StatusNotFound
+			}
 		}
+	} else {
+		log.Printf("restreamer: empty argument list\n", path[0])
+		return ErrInvalidObject, http.StatusNotFound
 	}
 }
