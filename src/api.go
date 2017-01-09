@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"net/url"
 	"net/http"
 	"encoding/json"
@@ -11,69 +12,192 @@ var (
 	ErrInternal = []byte("{'error':'internal'}")
 	ErrNotImplemented = []byte("{'error':'not_implemented'}")
 	ErrInvalidObject = []byte("{'error':'invalid_object'}")
+	ErrInvalidArgument = []byte("{'error':'invalid_argument'}")
 )
 
 type Endpoint interface {
 	Handle(path []string, query url.Values) ([]byte, int)
 }
 
-type RootEndpoint struct {
-	State *ShadeState
+type TreeEndpoint struct {
+	children map[string]Endpoint
 }
 
-func NewRootEndpoint(state *ShadeState) Endpoint {
-	return &RootEndpoint{
-		State: state,
+func NewTreeEndpoint() *TreeEndpoint {
+	return &TreeEndpoint{
+		children: make(map[string]Endpoint),
 	}
 }
 
-func (ep *RootEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
+func (ep *TreeEndpoint) Children() []string {
+	keys := make([]string, len(ep.children))
+	i := 0
+	for key := range ep.children {
+		keys[i] = key
+		i++
+	}
+	return keys
+}
+
+func (ep *TreeEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
+	if path == nil || len(path) == 0 || path[0] == "" {
+		response, err := json.Marshal(map[string]interface{}{
+			"children": ep.Children(),
+			"error": "none",
+		})
+		if err == nil {
+			return response, http.StatusOK
+		} else {
+			log.Print(err)
+			return ErrInternal, http.StatusInternalServerError
+		}
+	} else {
+		child := ep.children[path[0]]
+		if child != nil {
+			return child.Handle(path[1:], query)
+		} else {
+			log.Printf("restreamer: unknown child %s\n", path[0])
+			return ErrInvalidObject, http.StatusNotFound
+		}
+	}
+}
+
+type RootEndpoint struct {
+	*TreeEndpoint
+	state *ShadeState
+}
+
+func NewRootEndpoint(state *ShadeState) *RootEndpoint {
+	ep := &RootEndpoint{
+		TreeEndpoint: NewTreeEndpoint(),
+		state: state,
+	}
+	for key := range state.Shades {
+		ep.children[key] = NewShutterEndpoint(state, key)
+	}
+	return ep
+}
+
+type ShutterEndpoint struct {
+	*TreeEndpoint
+	state *ShadeState
+	name string
+}
+
+func NewShutterEndpoint(state *ShadeState, name string) *ShutterEndpoint {
+	ep := &ShutterEndpoint{
+		TreeEndpoint: NewTreeEndpoint(),
+		state: state,
+		name: name,
+	}
+	ep.children["flip"] = NewFlipEndpoint(state, name)
+	ep.children["move"] = NewMoveEndpoint(state, name)
+	return ep
+}
+
+func (ep *ShutterEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
-	if (len(path) >= 1) {
-		if (path[0] == "") {
-			shades := make(map[string]map[string]interface{})
-			for _, shade := range(ep.State.Shades) {
-				shades[shade.Name] = map[string]interface{}{
-					"name": shade.Name,
-					"position": shade.Position,
-					"angle": shade.Angle,
-				}
-			}
+	if path == nil || len(path) == 0 || path[0] == "" {
+		shutter := ep.state.Shades[ep.name]
+		response, err := json.Marshal(map[string]interface{}{
+			"name": shutter.Name,
+			"children": ep.Children(),
+			"position": shutter.Position,
+			"angle": shutter.Angle,
+		})
+		if err == nil {
+			return response, http.StatusOK
+		} else {
+			log.Print(err)
+			return ErrInternal, http.StatusInternalServerError
+		}
+	} else {
+		return ep.TreeEndpoint.Handle(path, query)
+	}
+}
+
+func (ep *ShutterEndpoint) Children() []string {
+	return make([]string, 0)
+}
+
+func (ep *ShutterEndpoint) Child(key string) Endpoint {
+	return nil
+}
+
+type FlipEndpoint struct {
+	state *ShadeState
+	name string
+}
+
+func NewFlipEndpoint(state *ShadeState, name string) *FlipEndpoint {
+	return &FlipEndpoint{
+		state: state,
+		name: name,
+	}
+}
+
+func (ep *FlipEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
+	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
+	if path == nil || len(path) == 0 || path[0] == "" {
+		shutter := ep.state.Shades[ep.name]
+		angle, err := strconv.ParseFloat(query.Get("angle"), 32)
+		if err == nil {
+			shutter.Flip(float32(angle))
 			response, err := json.Marshal(map[string]interface{}{
-				"shades": shades,
-				"error": "none",
+				"name": shutter.Name,
+				"angle": shutter.Angle,
 			})
-			if (err == nil) {
+			if err == nil {
 				return response, http.StatusOK
 			} else {
 				log.Print(err)
 				return ErrInternal, http.StatusInternalServerError
 			}
 		} else {
-			shade := ep.State.Shades[path[0]]
-			if (shade != nil) {
-				if (len(path) > 1) {
-					return ErrNotImplemented, http.StatusNotFound
-				} else {
-					response, err := json.Marshal(map[string]interface{}{
-						"name": shade.Name,
-						"position": shade.Position,
-						"angle": shade.Angle,
-					})
-					if (err == nil) {
-						return response, http.StatusOK
-					} else {
-						log.Print(err)
-						return ErrInternal, http.StatusInternalServerError
-					}
-				}
-			} else {
-				log.Printf("restreamer: object %s not found\n", path[0])
-				return ErrInvalidObject, http.StatusNotFound
-			}
+			log.Print(err)
+			return ErrInvalidArgument, http.StatusBadRequest
 		}
 	} else {
-		log.Printf("restreamer: empty argument list\n", path[0])
+		log.Printf("restreamer: unknown child %s\n", path[0])
+		return ErrInvalidObject, http.StatusNotFound
+	}
+}
+
+type MoveEndpoint struct {
+	state *ShadeState
+	name string
+}
+
+func NewMoveEndpoint(state *ShadeState, name string) *MoveEndpoint {
+	return &MoveEndpoint{
+		state: state,
+		name: name,
+	}
+}
+
+func (ep *MoveEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
+	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
+	if path == nil || len(path) == 0 || path[0] == "" {
+		shutter := ep.state.Shades[ep.name]
+		position, err := strconv.ParseFloat(query.Get("position"), 32)
+		if err == nil {
+			shutter.Move(float32(position))
+			response, err := json.Marshal(map[string]interface{}{
+				"name": shutter.Name,
+				"position": shutter.Position,
+			})
+			if err == nil {
+				return response, http.StatusOK
+			} else {
+				log.Print(err)
+				return ErrInternal, http.StatusInternalServerError
+			}
+		} else {
+			log.Print(err)
+			return ErrInvalidArgument, http.StatusBadRequest
+		}
+	} else {
+		log.Printf("restreamer: unknown child %s\n", path[0])
 		return ErrInvalidObject, http.StatusNotFound
 	}
 }
