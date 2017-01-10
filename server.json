@@ -1,7 +1,7 @@
 {
 	"listen": ":8080",
-	"uptime": 60,
-	"downtime": 60,
+	"uptime": 10,
+	"downtime": 10,
 	"fliptime": 3,
 	"shutters": [
 		{ "name": "1", "gpioup": 24, "gpiodown": 25 }
