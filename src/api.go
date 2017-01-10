@@ -64,15 +64,15 @@ func (ep *TreeEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 
 type RootEndpoint struct {
 	*TreeEndpoint
-	state *ShadeState
+	state *ShutterState
 }
 
-func NewRootEndpoint(state *ShadeState) *RootEndpoint {
+func NewRootEndpoint(state *ShutterState) *RootEndpoint {
 	ep := &RootEndpoint{
 		TreeEndpoint: NewTreeEndpoint(),
 		state: state,
 	}
-	for key := range state.Shades {
+	for key := range state.Shutters {
 		ep.children[key] = NewShutterEndpoint(state, key)
 	}
 	return ep
@@ -80,11 +80,11 @@ func NewRootEndpoint(state *ShadeState) *RootEndpoint {
 
 type ShutterEndpoint struct {
 	*TreeEndpoint
-	state *ShadeState
+	state *ShutterState
 	name string
 }
 
-func NewShutterEndpoint(state *ShadeState, name string) *ShutterEndpoint {
+func NewShutterEndpoint(state *ShutterState, name string) *ShutterEndpoint {
 	ep := &ShutterEndpoint{
 		TreeEndpoint: NewTreeEndpoint(),
 		state: state,
@@ -98,7 +98,7 @@ func NewShutterEndpoint(state *ShadeState, name string) *ShutterEndpoint {
 func (ep *ShutterEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
 	if path == nil || len(path) == 0 || path[0] == "" {
-		shutter := ep.state.Shades[ep.name]
+		shutter := ep.state.Shutters[ep.name]
 		response, err := json.Marshal(map[string]interface{}{
 			"name": shutter.Name,
 			"children": ep.Children(),
@@ -125,11 +125,11 @@ func (ep *ShutterEndpoint) Child(key string) Endpoint {
 }
 
 type FlipEndpoint struct {
-	state *ShadeState
+	state *ShutterState
 	name string
 }
 
-func NewFlipEndpoint(state *ShadeState, name string) *FlipEndpoint {
+func NewFlipEndpoint(state *ShutterState, name string) *FlipEndpoint {
 	return &FlipEndpoint{
 		state: state,
 		name: name,
@@ -139,7 +139,7 @@ func NewFlipEndpoint(state *ShadeState, name string) *FlipEndpoint {
 func (ep *FlipEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
 	if path == nil || len(path) == 0 || path[0] == "" {
-		shutter := ep.state.Shades[ep.name]
+		shutter := ep.state.Shutters[ep.name]
 		angle, err := strconv.ParseFloat(query.Get("angle"), 32)
 		if err == nil {
 			shutter.Flip(float32(angle))
@@ -164,11 +164,11 @@ func (ep *FlipEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 }
 
 type MoveEndpoint struct {
-	state *ShadeState
+	state *ShutterState
 	name string
 }
 
-func NewMoveEndpoint(state *ShadeState, name string) *MoveEndpoint {
+func NewMoveEndpoint(state *ShutterState, name string) *MoveEndpoint {
 	return &MoveEndpoint{
 		state: state,
 		name: name,
@@ -178,7 +178,7 @@ func NewMoveEndpoint(state *ShadeState, name string) *MoveEndpoint {
 func (ep *MoveEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
 	if path == nil || len(path) == 0 || path[0] == "" {
-		shutter := ep.state.Shades[ep.name]
+		shutter := ep.state.Shutters[ep.name]
 		position, err := strconv.ParseFloat(query.Get("position"), 32)
 		if err == nil {
 			shutter.Move(float32(position))

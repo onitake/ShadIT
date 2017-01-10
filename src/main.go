@@ -13,24 +13,24 @@ type Configuration struct {
 	UpTime int
 	DownTime int
 	FlipTime int
-	Shades []struct {
+	Shutters []struct {
 		Name string
 		GpioUp int
 		GpioDown int
 	}
 }
 
-type ShadeServer struct {
+type ShutterServer struct {
 	Root Endpoint
 }
 
-func NewShadeServer(state *ShadeState) *ShadeServer {
-	return &ShadeServer{
+func NewShutterServer(state *ShutterState) *ShutterServer {
+	return &ShutterServer{
 		Root: NewRootEndpoint(state),
 	}
 }
 
-func (server *ShadeServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (server *ShutterServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	path := strings.Split(request.URL.Path, "/")
 	// strip the empty string before the path separator
 	if (len(path) >= 1 && path[0] == "") {
@@ -64,7 +64,7 @@ func main() {
 	}
 	configfile.Close()
 
-	state := NewShadeState(&config)
-	server := NewShadeServer(state)
+	state := NewShutterState(&config)
+	server := NewShutterServer(state)
 	log.Fatal(http.ListenAndServe(config.Listen, server))
 }
