@@ -15,6 +15,24 @@ var (
 	ErrInvalidArgument = "invalid_argument"
 )
 
+func jsonResponse(data interface{}, code int) ([]byte, int) {
+	response, err := json.Marshal(data)
+	if err == nil {
+		return response, code
+	} else {
+		log.Print(err)
+		response, err = json.Marshal(map[string]string{
+			"error": ErrInternal,
+		})
+		if (err == nil) {
+			return response, http.StatusInternalServerError
+		} else {
+			log.Print(err)
+			return []byte{}, http.StatusInternalServerError
+		}
+	}
+}
+
 type Endpoint interface {
 	Handle(path []string, query url.Values) ([]byte, int)
 }
@@ -41,23 +59,18 @@ func (ep *TreeEndpoint) Children() []string {
 
 func (ep *TreeEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 	if path == nil || len(path) == 0 || path[0] == "" {
-		response, err := json.Marshal(map[string]interface{}{
+		return jsonResponse(map[string]interface{}{
 			"children": ep.Children(),
-			"error": "none",
-		})
-		if err == nil {
-			return response, http.StatusOK
-		} else {
-			log.Print(err)
-			return []byte("{\"error\":\"" + ErrInternal + "\"}"), http.StatusInternalServerError
-		}
+		}, http.StatusOK)
 	} else {
 		child := ep.children[path[0]]
 		if child != nil {
 			return child.Handle(path[1:], query)
 		} else {
 			log.Printf("restreamer: unknown child %s\n", path[0])
-			return []byte("{\"error\":\"" + ErrInvalidObject + "\"}"), http.StatusNotFound
+			return jsonResponse(map[string]interface{}{
+				"error": ErrInvalidObject,
+			}, http.StatusNotFound)
 		}
 	}
 }
@@ -99,18 +112,12 @@ func (ep *ShutterEndpoint) Handle(path []string, query url.Values) ([]byte, int)
 	//log.Printf("len(path)=%d path[0]=%s path[1]=%s\n", len(path), path[0], path[1])
 	if path == nil || len(path) == 0 || path[0] == "" {
 		shutter := ep.state.Shutters[ep.name]
-		response, err := json.Marshal(map[string]interface{}{
+		return jsonResponse(map[string]interface{}{
 			"name": shutter.Name,
 			"children": ep.Children(),
 			"position": shutter.Position,
 			"angle": shutter.Angle,
-		})
-		if err == nil {
-			return response, http.StatusOK
-		} else {
-			log.Print(err)
-			return []byte("{\"error\":\"" + ErrInternal + "\"}"), http.StatusInternalServerError
-		}
+		}, http.StatusOK)
 	} else {
 		return ep.TreeEndpoint.Handle(path, query)
 	}
@@ -144,23 +151,29 @@ func (ep *FlipEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 		if err == nil {
 			// TODO use a queue instead of just running this synchronously
 			shutter.Flip(float32(angle))
-			response, err := json.Marshal(map[string]interface{}{
+			return jsonResponse(map[string]interface{}{
 				"name": shutter.Name,
 				"angle": shutter.Angle,
-			})
-			if err == nil {
-				return response, http.StatusOK
-			} else {
-				log.Print(err)
-				return []byte("{'error':'" + ErrInternal + "'}"), http.StatusInternalServerError
-			}
+			}, http.StatusOK)
 		} else {
 			log.Print(err)
-			return []byte("{\"error\":\"" + ErrInvalidArgument + "\",\"args\":[{\"name\":\"angle\",\"type\":\"float\",\"range\":\"0..1\"}]}"), http.StatusBadRequest
+			return jsonResponse(map[string]interface{}{
+				"error": ErrInvalidArgument,
+				"args": []interface{}{
+					map[string]interface{}{
+						"name": "angle",
+						"type": "float",
+						"range_from": 0.0,
+						"range_to": 1.0,
+					},
+				},
+			}, http.StatusBadRequest)
 		}
 	} else {
 		log.Printf("restreamer: unknown child %s\n", path[0])
-		return []byte("{\"error\":\"" + ErrInvalidObject + "\"}"), http.StatusNotFound
+		return jsonResponse(map[string]interface{}{
+			"error": ErrInvalidObject,
+		}, http.StatusNotFound)
 	}
 }
 
@@ -184,22 +197,28 @@ func (ep *MoveEndpoint) Handle(path []string, query url.Values) ([]byte, int) {
 		if err == nil {
 			// TODO use a queue instead of just running this synchronously
 			shutter.Move(float32(position))
-			response, err := json.Marshal(map[string]interface{}{
+			return jsonResponse(map[string]interface{}{
 				"name": shutter.Name,
 				"position": shutter.Position,
-			})
-			if err == nil {
-				return response, http.StatusOK
-			} else {
-				log.Print(err)
-				return []byte("{\"error\":\"" + ErrInternal + "\"}"), http.StatusInternalServerError
-			}
+			}, http.StatusOK)
 		} else {
 			log.Print(err)
-			return []byte("{\"error\":\"" + ErrInvalidArgument + "\",\"args\":[{\"name\":\"position\",\"type\":\"float\",\"range\":\"0..100\"}]}"), http.StatusBadRequest
+			return jsonResponse(map[string]interface{}{
+				"error": ErrInvalidArgument,
+				"args": []interface{}{
+					map[string]interface{}{
+						"name": "position",
+						"type": "float",
+						"range_from": 0.0,
+						"range_to": 100.0,
+					},
+				},
+			}, http.StatusBadRequest)
 		}
 	} else {
 		log.Printf("restreamer: unknown child %s\n", path[0])
-		return []byte("{\"error\":\"" + ErrInvalidObject + "\"}"), http.StatusNotFound
+		return jsonResponse(map[string]interface{}{
+			"error": ErrInvalidObject,
+		}, http.StatusNotFound)
 	}
 }
