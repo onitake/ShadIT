@@ -1,12 +1,12 @@
-ShadIT
-========
+shudder
+=======
 
 Remote control system for legacy window shutter actuators.
 
 Copyright © 2017, Gregor Riepl <onitake@gmail.com>
 All rights reserved.
 
-ShadIT is a web API server you can install on Raspberry Pi
+shudder is a web API server you can install on Raspberry Pi
 (or similar embedded computers) to remote control electric
 window shutters.
 
