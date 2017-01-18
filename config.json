@@ -4,6 +4,6 @@
 	"downtime": 10,
 	"fliptime": 3,
 	"shutters": [
-		{ "name": "1", "gpioup": 24, "gpiodown": 25 }
+		{ "name": "1", "gpioup": 2, "gpiodown": 3 }
 	]
 }

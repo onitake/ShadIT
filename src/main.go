@@ -49,12 +49,12 @@ func main() {
 	if len(os.Args) > 1 {
 		configname = os.Args[1]
 	} else {
-		configname = "server.json"
+		configname = "config.json"
 	}
 	
 	configfile, err := os.Open(configname)
 	if err != nil {
-		log.Fatal("Can't read configuration from server.json: ", err)
+		log.Fatal("Can't read configuration from config.json: ", err)
 	}
 	decoder := json.NewDecoder(configfile)
 	config := Configuration{}

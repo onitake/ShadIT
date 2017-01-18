@@ -1,9 +1,9 @@
 export GOPATH=$(shell pwd)
 
-all: bin/server
+all: bin/shudder
 
 clean:
 	rm -f bin/* pkg/*
 
-bin/server: src/api.go src/main.go src/model.go src/gpio.go
+bin/shudder: src/api.go src/main.go src/model.go src/gpio.go
 	go build -o $@ $^
