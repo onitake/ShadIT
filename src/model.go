@@ -37,6 +37,7 @@ func (shutter *Shutter) Reset() {
 
 func (shutter *Shutter) Flip(angle float32) {
 	log.Printf("Flipping shutter %s to angle %f\n", shutter.Name, angle)
+	// TODO adjust the position as well, or use angle directly
 	GpioSet(shutter.GpioDown, false)
 	GpioSet(shutter.GpioUp, true)
 	time.Sleep(shutter.FlipUpTime)
@@ -48,6 +49,7 @@ func (shutter *Shutter) Flip(angle float32) {
 }
 
 func (shutter *Shutter) Move(position float32) {
+	// TODO adjust the angle as well, according to the direction
 	if (position > shutter.Position) {
 		log.Printf("Moving shutter %s down to position %f\n", shutter.Name, position)
 		GpioSet(shutter.GpioUp, false)
