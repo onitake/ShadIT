@@ -15,8 +15,8 @@ type Configuration struct {
 	FlipTime int
 	Shutters []struct {
 		Name string
-		GpioUp int
-		GpioDown int
+		GpioUp string
+		GpioDown string
 	}
 }
 
@@ -64,7 +64,10 @@ func main() {
 	}
 	configfile.Close()
 
-	state := NewShutterState(&config)
+	state, err := NewShutterState(&config)
+	if err != nil {
+		log.Fatal("Error creating state object: ", err)
+	}
 	server := NewShutterServer(state)
 	log.Fatal(http.ListenAndServe(config.Listen, server))
 }
