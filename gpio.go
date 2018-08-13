@@ -24,7 +24,11 @@ func GpioInit(line int, output bool) error {
 		log.Print(err)
 		return err
 	}
-	out.Write([]byte("out"))
+	if output {
+		out.Write([]byte("out"))
+	} else {
+		out.Write([]byte("in"))
+	}
 	out.Close()
 	
 	return nil
